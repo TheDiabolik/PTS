@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ImageAnalysisSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <m_plateMinWidth>60</m_plateMinWidth>
+  <m_plateMaxWidth>150</m_plateMaxWidth>
+  <m_plateMinHeight>18</m_plateMinHeight>
+  <m_plateMaxHeight>100</m_plateMaxHeight>
+  <m_plateMinAspectRatio>2</m_plateMinAspectRatio>
+  <m_plateMaxAspectRatio>5</m_plateMaxAspectRatio>
+  <m_plateMinArea>1000</m_plateMinArea>
+  <m_plateMaxArea>4000</m_plateMaxArea>
+  <m_characterMinWidth>3</m_characterMinWidth>
+  <m_characterMaxWidth>20</m_characterMaxWidth>
+  <m_characterMinHeight>9</m_characterMinHeight>
+  <m_characterMaxHeight>26</m_characterMaxHeight>
+  <m_characterMinAspectRatio>0.12</m_characterMinAspectRatio>
+  <m_characterMaxAspectRatio>1</m_characterMaxAspectRatio>
+  <m_characterMinArea>1000</m_characterMinArea>
+  <m_characterMaxArea>4000</m_characterMaxArea>
+  <m_characterMinDiagonalLength>7</m_characterMinDiagonalLength>
+  <m_characterMaxDiagonalLength>30</m_characterMaxDiagonalLength>
+</ImageAnalysisSettings>

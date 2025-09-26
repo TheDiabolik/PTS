@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreProcessingSettings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <m_ReadPlateFromImagePath>F:\Plaka Tanıma Resimleri\5030çıkış\giriş</m_ReadPlateFromImagePath>
+  <m_ReadPlateFromVideoPath>F:\OCR Karakter Resimleri\Karakterler Birleştirilmiş OCR Train Set 03.10.2024</m_ReadPlateFromVideoPath>
+  <m_ShowPlate>true</m_ShowPlate>
+  <m_MajorityVoiting>1</m_MajorityVoiting>
+  <m_OCRWorkingType>Continuous</m_OCRWorkingType>
+  <m_GaussianBlurKernel>5</m_GaussianBlurKernel>
+  <m_preProcessingType>BlurCLAHEOtsu</m_preProcessingType>
+  <m_adaptiveThreshouldBlock>9</m_adaptiveThreshouldBlock>
+  <m_adaptiveThreshouldC>3</m_adaptiveThreshouldC>
+  <m_AdaptiveThreshouldType>Gaussian</m_AdaptiveThreshouldType>
+  <m_plateMinWidth>50</m_plateMinWidth>
+  <m_plateMaxWidth>150</m_plateMaxWidth>
+  <m_plateMinHeight>18</m_plateMinHeight>
+  <m_plateMaxHeight>100</m_plateMaxHeight>
+  <m_plateMinAspectRatio>1.4</m_plateMinAspectRatio>
+  <m_plateMaxAspectRatio>5</m_plateMaxAspectRatio>
+  <m_plateMinArea>1000</m_plateMinArea>
+  <m_plateMaxArea>4000</m_plateMaxArea>
+  <m_characterMinWidth>2</m_characterMinWidth>
+  <m_characterMaxWidth>25</m_characterMaxWidth>
+  <m_characterMinHeight>9</m_characterMinHeight>
+  <m_characterMaxHeight>29</m_characterMaxHeight>
+  <m_characterMinAspectRatio>0.12</m_characterMinAspectRatio>
+  <m_characterMaxAspectRatio>0.7</m_characterMaxAspectRatio>
+  <m_characterMinArea>10</m_characterMinArea>
+  <m_characterMaxArea>300</m_characterMaxArea>
+  <m_characterMinDiagonalLength>7</m_characterMinDiagonalLength>
+  <m_characterMaxDiagonalLength>30</m_characterMaxDiagonalLength>
+  <m_AutoWhiteBalance>true</m_AutoWhiteBalance>
+  <m_AutoLightControl>true</m_AutoLightControl>
+  <m_FindMovementPlate>false</m_FindMovementPlate>
+  <m_PlateType>Turkish</m_PlateType>
+  <m_FixOCRErrors>true</m_FixOCRErrors>
+  <m_SelectBestResult>true</m_SelectBestResult>
+</PreProcessingSettings>
