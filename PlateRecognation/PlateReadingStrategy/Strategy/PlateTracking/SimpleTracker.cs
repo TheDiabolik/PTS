@@ -84,169 +84,46 @@ namespace PlateRecognation
             DetectedThisFrame = false;        // bayrağı temizle
         }
 
-
-        public void AddOcrSample(Mat img144x32, double sharp, double svmScore, int frameIdx)
-        {
-            if (_ocrBuf.Count >= OcrSamplesCap)
-            {
-                _ocrBuf[0].Img144x32?.Dispose();
-                _ocrBuf.RemoveAt(0);
-            }
-            _ocrBuf.Add(new OcrSample { Img144x32 = img144x32.Clone(), Sharpness = sharp, SvmScore = svmScore, FrameIndex = frameIdx });
-        }
-
-
-        //public void AddOcrSampleWithCapacity(Mat img144x32, double sharp, double score, int frameIdx, int maxBuf)
-        //{
-        //    // içerde clone ediyorsan burada sadece referansı alabilirsin
-        //    _ocrBuf.Add(new OcrSample { Img144x32 = img144x32.Clone(), Sharpness = sharp, SvmScore = score, FrameIndex = frameIdx });
-
-        //    if (_ocrBuf.Count > maxBuf)
-        //    {
-        //        // “en kötü” örneği çıkar: örn. (Score ağırlıklı ve Sharp ikincil)
-        //        int worst = 0; 
-        //        double worstKey = double.MaxValue;
-
-        //        for (int i = 0; i < _ocrBuf.Count; i++)
-        //        {
-        //            // Küçük skor ve küçük keskinlik “kötü”
-        //            double key = 0.8 * (1.0 - _ocrBuf[i].SvmScore) + 0.2 * (1.0 / (1.0 + _ocrBuf[i].Sharpness));
-
-        //            if (key < worstKey) 
-        //                continue;
-
-        //            worstKey = key; worst = i;
-        //        }
-        //        _ocrBuf.RemoveAt(worst);
-        //    }
-        //}
-
-        public void AddOcrSampleWithCapacity(Mat img144x32, double sharpness, double svmScore, int frameIdx, int maxBuf)
+        
+        public void AddOrReplaceOcrSample(Mat img144x32, double sharpness, double svmScore, int frameIdx, Rect rect, int maxBuf)
         {
             if (img144x32 == null || img144x32.Empty())
                 return;
 
-            // Aynı kareden duplicate ekleme (sen zaten dışarıda kontrol ediyorsun ama ek güvenlik):
-            if (_ocrBuf.Any(s => s.FrameIndex == frameIdx)) 
-                return;
-
-            // Mat mutlaka clone edilerek saklanmalı (yoksa dışarıda dispose olur):
-            var clone = img144x32.Clone();
-
-            _ocrBuf.Add(new OcrSample
-            {
-                Img144x32 = clone,
-                Sharpness = sharpness,
-                SvmScore = svmScore,
-                FrameIndex = frameIdx
-            });
-
+            // --- Ayarlar / yardımcılar ---
             int cap = (maxBuf > 0 ? maxBuf : (OcrSamplesCap > 0 ? OcrSamplesCap : 3));
 
-            if (_ocrBuf.Count <= cap) 
-                return;
-
-            // Kapasite aşıldı → “en kötü” örneği çıkar
-            int worst = 0;
-            double worstKey = double.NegativeInfinity; // daha büyük = daha kötü
-
-            for (int i = 0; i < _ocrBuf.Count; i++)
-            {
-                // Kötülük ölçütü: düşük SVM ve düşük keskinlik kötü.
-                // (Sharpness yoksa sadece SVM’le karar ver)
-                double bad = 1.0 - _ocrBuf[i].SvmScore;
-
-                if (_ocrBuf[i].Sharpness > 0)
-                    bad = 0.8 * (1.0 - _ocrBuf[i].SvmScore) + 0.2 * (1.0 / (1.0 + _ocrBuf[i].Sharpness));
-
-                if (bad > worstKey) 
-                { 
-                    worstKey = bad; 
-                    worst = i; 
-                }
-            }
-
-            _ocrBuf[worst].Img144x32?.Dispose(); // sızıntıyı önle
-            _ocrBuf.RemoveAt(worst);
-        }
-
-
-
-        public void AddOcrSampleWithCapacityvOrj(Mat img144x32, double sharpness, double svmScore, int frameIdx, int maxBuf, Rect rect)
-        {
-            if (img144x32 == null || img144x32.Empty())
-                return;
-
-            // Aynı kareden duplicate ekleme (sen zaten dışarıda kontrol ediyorsun ama ek güvenlik):
-            if (_ocrBuf.Any(s => s.FrameIndex == frameIdx))
-                return;
-
-            // Mat mutlaka clone edilerek saklanmalı (yoksa dışarıda dispose olur):
-            var clone = img144x32.Clone();
-
-            _ocrBuf.Add(new OcrSample
-            {
-                Img144x32 = clone,
-                Sharpness = sharpness,
-                SvmScore = svmScore,
-                FrameIndex = frameIdx,
-                Rect = rect
-            });
-
-            int cap = (maxBuf > 0 ? maxBuf : (OcrSamplesCap > 0 ? OcrSamplesCap : 3));
-
-            if (_ocrBuf.Count <= cap)
-                return;
-
-            // Kapasite aşıldı → “en kötü” örneği çıkar
-            int worst = 0;
-            double worstKey = double.NegativeInfinity; // daha büyük = daha kötü
-
-            for (int i = 0; i < _ocrBuf.Count; i++)
-            {
-                // Kötülük ölçütü: düşük SVM ve düşük keskinlik kötü.
-                // (Sharpness yoksa sadece SVM’le karar ver)
-                double bad = 1.0 - _ocrBuf[i].SvmScore;
-
-                if (_ocrBuf[i].Sharpness > 0)
-                    bad = 0.8 * (1.0 - _ocrBuf[i].SvmScore) + 0.2 * (1.0 / (1.0 + _ocrBuf[i].Sharpness));
-
-                if (bad > worstKey)
-                {
-                    worstKey = bad;
-                    worst = i;
-                }
-            }
-
-            _ocrBuf[worst].Img144x32?.Dispose(); // sızıntıyı önle
-            _ocrBuf.RemoveAt(worst);
-        }
-
-
-        public void AddOrReplaceOcrSample(Mat img144x32, double sharpness, double svmScore, int frameIdx, Rect rect, int maxBuf, double iouSameFrameThr = 0.60)
-        {
-            if (img144x32 == null || img144x32.Empty()) return;
-
-            // Aynı kareden halihazırda sample var mı? (IoU ile kontrol et)
-            int sameFrameIdx = -1;
-            for (int i = 0; i < _ocrBuf.Count; i++)
-            {
-                var s = _ocrBuf[i];
-                if (s.FrameIndex != frameIdx) continue;
-
-                double iou = RectComparisonHelper.IoU(s.Rect, rect);
-                if (iou >= iouSameFrameThr) { sameFrameIdx = i; break; }
-            }
-
-            // “İyilik” karşılaştırıcısı: önce SVM, eşitse Sharpness
-            bool IsBetter(double newScore, double newSharp, double oldScore, double oldSharp)
+            static bool IsBetter(double newScore, double newSharp, double oldScore, double oldSharp)
                 => (newScore > oldScore) || (newScore == oldScore && newSharp > oldSharp);
 
+            // "Kötülük" metriği: önce düşük SVM cezalı, eşitse düşük sharpness cezalı
+            static double Badness(double svm, double sharp)
+            {
+                // 0..1 bandında normalize sharpness yoksa yine de işler: ağırlıklar dengeli
+                // SVM daha baskın: 0.85, sharpness 0.15
+                double a = 0.85 * (1.0 - svm);
+                double b = 0.15 * (sharp > 0 ? (1.0 / (1.0 + sharp)) : 1.0);
+                return a + b;
+            }
+
+            // --- Aynı frame'den sample var mı? (IoU'suz; opsiyonel çok-yüksek IoU kontrolü)
+            int sameFrameIdx = -1;
+
+            for (int i = 0; i < _ocrBuf.Count; i++)
+            {
+                if (_ocrBuf[i].FrameIndex == frameIdx)
+                {
+                    sameFrameIdx = i;
+                    break;
+                }
+            }
+
+            // Klonu en sonda ekleyeceğimiz/yerine koyacağımız için hazırlayalım
             var clone = img144x32.Clone();
 
             if (sameFrameIdx >= 0)
             {
-                // Aynı kare + aynı bölge sayılır → iyiyse replace
+                // Aynı karede bir örnek var → iyisi kalsın
                 var old = _ocrBuf[sameFrameIdx];
                 if (IsBetter(svmScore, sharpness, old.SvmScore, old.Sharpness))
                 {
@@ -262,12 +139,13 @@ namespace PlateRecognation
                 }
                 else
                 {
-                    clone.Dispose(); // sızıntı yok
+                    // Yeni örnek daha kötü → klonu at
+                    clone.Dispose();
                 }
                 return;
             }
 
-            // Aynı karede benzer bölge yoksa yeni ekle
+            // Aynı karede örnek yok → yeni ekle
             _ocrBuf.Add(new OcrSample
             {
                 Img144x32 = clone,
@@ -277,29 +155,29 @@ namespace PlateRecognation
                 Rect = rect
             });
 
-            int cap = (maxBuf > 0 ? maxBuf : (OcrSamplesCap > 0 ? OcrSamplesCap : 3));
-            if (_ocrBuf.Count <= cap) return;
-
-            // Kapasite aşıldı → en kötü örneği at
-            int worst = 0;
-            double worstKey = double.NegativeInfinity;
-            for (int i = 0; i < _ocrBuf.Count; i++)
+            // Kapasiteyi aşmışsak en kötüyü çıkar (gerekirse birden fazla)
+            while (_ocrBuf.Count > cap)
             {
-                double bad = 1.0 - _ocrBuf[i].SvmScore;
-                if (_ocrBuf[i].Sharpness > 0)
-                    bad = 0.8 * (1.0 - _ocrBuf[i].SvmScore) + 0.2 * (1.0 / (1.0 + _ocrBuf[i].Sharpness));
+                int worst = 0;
+                double worstKey = double.NegativeInfinity;
 
-                if (bad > worstKey) { worstKey = bad; worst = i; }
+                for (int i = 0; i < _ocrBuf.Count; i++)
+                {
+                    var e = _ocrBuf[i];
+                    double bad = Badness(e.SvmScore, e.Sharpness);
+                    if (bad > worstKey) { worstKey = bad; worst = i; }
+                }
+
+                _ocrBuf[worst].Img144x32?.Dispose();
+                _ocrBuf.RemoveAt(worst);
             }
-            _ocrBuf[worst].Img144x32?.Dispose();
-            _ocrBuf.RemoveAt(worst);
         }
 
 
 
         public bool TryPickBestOcrSample(out OcrSample best)
         {
-            if (_ocrBuf.Count == 0) 
+            if (_ocrBuf.Count == 0)  
             { 
                 best = default; 
                 return false; 

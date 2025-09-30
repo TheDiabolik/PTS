@@ -177,15 +177,22 @@ namespace PlateRecognation
                     Cv2.Absdiff(prevGray, gray, diff);
                     Cv2.Threshold(diff, diff, 25, 255, ThresholdTypes.Binary);
 
+
+
+                    Cv2.GaussianBlur(diff, diff, new OpenCvSharp.Size(5, 5), 0);
+                    Cv2.Threshold(diff, diff, 25, 255, ThresholdTypes.Binary);
+
                     //gpt önerisi
-                    using (var kClose = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(7, 3)))
+                    using (var kClose = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(9, 5)))
                         Cv2.MorphologyEx(diff, diff, MorphTypes.Close, kClose);
-                    using (var kOpen = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(5, 3)))
+                    using (var kOpen = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(3, 3)))
                         Cv2.MorphologyEx(diff, diff, MorphTypes.Open, kOpen);
+
 
 
                     int motionPixels = Cv2.CountNonZero(diff);
                     double motionRatio = (double)motionPixels / Math.Max(1.0, gray.Total());
+
 
                     bool shouldProcess = motionRatio > 0.02;
 
@@ -258,6 +265,8 @@ namespace PlateRecognation
                 Mat currBgr = frameWithRoi.Frame;
                 using var currGrayFull = new Mat();
                 Cv2.CvtColor(currBgr, currGrayFull, ColorConversionCodes.BGR2GRAY);
+
+                
 
                 // 2) Detection & association (seed / emme)
                 DetectAndAssociate(frameWithRoi, currBgr, currGrayFull, frameIdx);
