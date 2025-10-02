@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Formats.Asn1.AsnWriter;
+using static System.Reflection.Metadata.BlobBuilder;
 
 namespace PlateRecognation
 {
@@ -201,7 +203,7 @@ namespace PlateRecognation
                 if (plates == null || plates.Count == 0)
                     continue;
 
-                //plates.Sort((a, b) => b.PlateScore.CompareTo(a.PlateScore));
+                plates.Sort((a, b) => b.PlateScore.CompareTo(a.PlateScore));
 
                 foreach (var p in plates)
                 {
@@ -283,63 +285,6 @@ namespace PlateRecognation
                 }
             }
         }
-
-
-     
-
-        //private void UpdateTrackers(Mat prevGray, Mat currGray, ThreadSafeList<SimpleTracker> trackers, int frameIdx)
-        //{
-        //    if (prevGray == null || prevGray.Empty() || currGray == null || currGray.Empty())
-        //        return;
-
-        //    var imgSize = currGray.Size();
-
-        //    // 1) Hızlı erişim için id->index haritası (isteğe bağlı optimizasyon)
-        //    var snap = trackers.Snapshot();
-
-        //    var idToIdx = new Dictionary<int, int>(snap.Length);
-
-        //    for (int i = 0; i < snap.Length; i++)
-        //    {
-        //        idToIdx[snap[i].Id] = trackers.FindIndex(tr => tr.Id == snap[i].Id); // ya da ThreadSafeList uygun metodu
-        //    }
-
-        //    foreach (var t in snap)
-        //    {
-        //        // Bu karede deteksiyonla zaten güncellendiyse → optiği atla
-        //        if (t.LastSeenFrame == frameIdx)
-        //            continue;
-
-        //        if (!idToIdx.TryGetValue(t.Id, out int idx) || idx < 0)
-        //            continue;
-
-        //        var tr = trackers[idx];
-
-        //        // Ölü veya tolerans aşılmışsa atla (tercihe bağlı)
-        //        if (tr.IsDead())
-        //            continue;
-
-        //        // LK adımı
-        //        bool alive = tr.StepLK(prevGray, currGray, imgSize, frameIdx, minInliers: 6, tolMisses: _maxMisses);
-
-        //        if (alive)
-        //        {
-        //            // Sadece başarılı adımda "bu karede görüldü" işaretle
-        //            //tr.LastSeenFrame = frameIdx;
-        //            // tr.TrackRect zaten StepLK içinde güncellenmiş olmalı (flow centroid/median ile)
-
-        //            //Debug.WriteLine("Optical flow plaka alanını takip etti. - Frame : " + frameIdx.ToString());
-        //        }
-        //        else
-        //        {
-        //            // Misses içeride artıyorsa burada sadece bırak; 
-        //            // hard-case: re-anchor bayrağı vs. set edebilirsin
-        //            // tr.NeedsReanchor = true; (opsiyon)
-        //        }
-
-        //        trackers[idx] = tr;
-        //    }
-        //}
 
         private void UpdateTrackers(Mat prevGray, Mat currGray, ThreadSafeList<SimpleTracker> trackers, int frameIdx)
         {
@@ -464,273 +409,6 @@ namespace PlateRecognation
             return idsToRemove.Count;
         }
 
-        private void EvaluateTrackersForOcrvOrj(Mat currGrayFull, Mat currBgr, int frameIdx)
-        {
-            var snap = _tracked.Snapshot();
-
-            for (int s = 0; s < snap.Length; s++)
-            {
-                var tId = snap[s].Id;
-                int idx = _tracked.FindIndex(tr => tr.Id == tId);
-
-                if (idx < 0)
-                    continue;
-                
-                var tracker = _tracked[idx];
-
-                if (tracker.OcrEnqueued)
-                {
-                    tracker.CommitDetection();   // detection varsa TrackRect’e commit et + flag’i temizle
-                    _tracked[idx] = tracker;
-                    continue;
-                }
-
-                // Crop seçimi (detection varsa onu tercih et)
-                var cropRect = tracker.DetectedThisFrame ? tracker.DetectionRect : tracker.TrackRect;
-                cropRect = RectGeometryHelper.Clip(cropRect, currGrayFull.Cols, currGrayFull.Rows);
-
-                if (cropRect.Width <= 0 || cropRect.Height <= 0)
-                {
-                    tracker.DetectedThisFrame = false;
-                    _tracked[idx] = tracker;
-                    continue;
-                }
-               
-                bool hitThisFrame = (tracker.LastSeenFrame == frameIdx); // detection veya LK successful
-
-                if (hitThisFrame /* && tracker.LastScore >= _svmTrackThr*/) // istersen burada skor eşiği uygula
-                {
-                    using var svmCrop = new Mat(currGrayFull, cropRect);
-                    Cv2.Resize(svmCrop, svmCrop, new OpenCvSharp.Size(144, 32), 0, 0, InterpolationFlags.Lanczos4);
-
-                    var result = SVMHelper.AskSVMPredictionForPlateRegionWithScore(MainForm.m_mainForm.m_loadedSvmForPlateRegion, svmCrop, 0);
-                    tracker.LastScore = result.score;
-
-
-                    tracker.MarkPass();
-
-                    bool hasThisFrame = tracker._ocrBuf.Any(s => s.FrameIndex == frameIdx);
-
-                    //if (!hasThisFrame)
-                    //    tracker.AddOcrSampleWithCapacity(svmCrop, sharpness: 0, tracker.LastScore, frameIdx, tracker.OcrSamplesCap);
-
-                    //if (!hasThisFrame)
-                    //    // tracker.AddOcrSampleWithCapacity((svmCrop, sharpness: 0, tracker.LastScore, frameIdx, tracker.OcrSamplesCap,tracker.TrackRect);
-                    //    tracker.AddOrReplaceOcrSample(svmCrop, sharpness: 0, tracker.LastScore, frameIdx, tracker.TrackRect, tracker.OcrSamplesCap, false);
-
-
-
-                    if (tracker.IsReadyForOcr() && tracker.TryMarkOcrEnqueued())
-                    {
-                        if (tracker.TryPickBestOcrSample(out SimpleTracker.OcrSample best)) // 0->1 atomik geçiş
-                        {
-                            DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.pictureBox4, best.Img144x32.ToBitmap());
-
-                            DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM1, tracker._ocrBuf[0].Img144x32.ToBitmap());
-                            DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM2, tracker._ocrBuf[1].Img144x32.ToBitmap());
-                            DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM3, tracker._ocrBuf[2].Img144x32.ToBitmap());
-
-
-                            //string zo = string.Format("1. item : {0} - 2. item : {1} - 3. item : {2}", tracker._ocrBuf[0].FrameIndex,
-                            //    tracker._ocrBuf[1].FrameIndex, tracker._ocrBuf[2].FrameIndex);
-
-                            //Debug.WriteLine(zo);
-
-                            //Debug.WriteLine($"ENQ id={tracker.Id} thr={System.Threading.Thread.CurrentThread.ManagedThreadId} "
-                            //       + $"buf=({tracker._ocrBuf[0].FrameIndex},{tracker._ocrBuf[0].Rect.Location}," +
-                            //       $"{tracker._ocrBuf[1].FrameIndex},{tracker._ocrBuf[1].Rect.Location}," +
-                            //       $"{tracker._ocrBuf[2].FrameIndex},{tracker._ocrBuf[2].Rect.Location}) f={frameIdx}");
-
-                            Debug.WriteLine($"ENQ id={tracker.Id} thr={System.Threading.Thread.CurrentThread.ManagedThreadId} "
-                                  + $"buf=({tracker._ocrBuf[0].FrameIndex}" + " "+
-                                  $"{tracker._ocrBuf[1].FrameIndex}" + " " +
-                                  $"{tracker._ocrBuf[2].FrameIndex}) f={frameIdx}");
-
-
-                            // Kuyruğa ekle (frame klonlama + crop görseli)
-                            EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
-                        }
-
-                        else
-                        {
-                            tracker.ClearOcrEnqueued(); // ← kritik: kilidi geri bırak
-                        }
-                    }
-                   
-
-                            
-                }
-                else
-                {
-                    // Ardışık istiyorsan:
-                    tracker.ResetPass();
-
-                    //DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxNotPlate, svmCrop.ToBitmap());
-                }
-
-                // Bu kare bitti: detection bayrağını sıfırla (frame sonu reset'te de yapılabilir)
-                //tracker.DetectedThisFrame = false;
-
-                tracker.CommitDetection();
-
-                _tracked[idx] = tracker;
-            }
-        }
-        private void EvaluateTrackersForOcrvOrj2(Mat currGrayFull, Mat currBgr, int frameIdx)
-        {
-            if (currGrayFull == null || currGrayFull.Empty()) return;
-
-            // Aynı karede aynı plakayı ikinci kez OCR’a sokmayı önlemek için
-            var enqueuedThisFrame = new List<Rect>();
-
-            var snap = _tracked.Snapshot();
-
-            for (int s = 0; s < snap.Length; s++)
-            {
-                var tId = snap[s].Id;
-                int idx = _tracked.FindIndex(tr => tr.Id == tId);
-                if (idx < 0) continue;
-
-                var tracker = _tracked[idx];
-
-                // Zaten OCR kuyruğuna işaretlenmişse: sadece detection'ı TrackRect'e commit et, devam etme
-                if (tracker.OcrEnqueued)
-                {
-                    tracker.CommitDetection();   // (valid ise) TrackRect = DetectionRect; flag temizlenir
-                    _tracked[idx] = tracker;
-                    continue;
-                }
-
-                // Crop seçimi (detection varsa onu, yoksa track)
-                var cropRect = tracker.DetectedThisFrame ? tracker.DetectionRect : tracker.TrackRect;
-                cropRect = RectGeometryHelper.Clip(cropRect, currGrayFull.Cols, currGrayFull.Rows);
-
-                // Geçersiz crop → bu kareyi pas geç (detection flag'i de temizle)
-                if (cropRect.Width <= 0 || cropRect.Height <= 0)
-                {
-                    tracker.CommitDetection();
-                    _tracked[idx] = tracker;
-                    continue;
-                }
-
-                // Bu karede görüldü mü? (detection ya da LK başarılı)
-                bool hitThisFrame = (tracker.LastSeenFrame == frameIdx);
-
-                if (hitThisFrame) // ağır işleri sadece hit olduğunda çalıştır
-                {
-                    using var svmCrop = new Mat(currGrayFull, cropRect);
-                    Cv2.Resize(svmCrop, svmCrop, new OpenCvSharp.Size(144, 32), 0, 0, InterpolationFlags.Lanczos4);
-
-                    var result = SVMHelper.AskSVMPredictionForPlateRegionWithScore(
-                                     MainForm.m_mainForm.m_loadedSvmForPlateRegion, svmCrop, 0);
-                    tracker.LastScore = result.score;
-
-                    tracker.MarkPass();
-
-                    // Aynı karede gelen sample için add-or-replace (frame+IoU ile tekilleştirir)
-                    //tracker.AddOrReplaceOcrSample(
-                    //    img144x32: svmCrop,
-                    //    sharpness: 0,
-                    //    svmScore: tracker.LastScore,
-                    //    frameIdx: frameIdx,
-                    //    rect: cropRect,
-                    //    maxBuf: tracker.OcrSamplesCap
-                    //    , false);
-
-                    // OCR'a hazırsa 0->1 atomik geçiş dene
-                    if (tracker.IsReadyForOcr() && tracker.TryMarkOcrEnqueued())
-                    {
-                        if (tracker.TryPickBestOcrSample(out SimpleTracker.OcrSample best) && best.Img144x32 != null)
-                        {
-                            // Per-frame mekânsal dedup: aynı karede aynı plakayı ikinci kez enqueuelama
-                            double maxIou = 0.0;
-                            foreach (var rPrev in enqueuedThisFrame)
-                            {
-                                double iou = RectComparisonHelper.IoU(rPrev, cropRect);
-                                if (iou > maxIou) maxIou = iou;
-                            }
-
-                            if (maxIou >= 0.65) // sahneye göre 0.6–0.75 arasında deneyebilirsin
-                            {
-                                Debug.WriteLine($"DEDUP drop id={tracker.Id} f={frameIdx} IOUmax={maxIou:0.00}");
-                                tracker.ClearOcrEnqueued();
-                            }
-                            else
-                            {
-                                // Görseller (guard'lı)
-                                int cnt = tracker._ocrBuf.Count;
-                                DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.pictureBox4, best.Img144x32.ToBitmap());
-                                if (cnt > 0) DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM1, tracker._ocrBuf[0].Img144x32.ToBitmap());
-                                if (cnt > 1) DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM2, tracker._ocrBuf[1].Img144x32.ToBitmap());
-                                if (cnt > 2) DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.m_pictureBoxSVM3, tracker._ocrBuf[2].Img144x32.ToBitmap());
-
-                                // Teşhis logu (IndexOutOfRange'a dayanıklı)
-                                //string BufEntry(int i)
-                                //{
-                                //    if (i < 0 || i >= cnt) return "-";
-                                //    var sEntry = tracker._ocrBuf[i];
-                                //    return $"[{i}] f={sEntry.FrameIndex} rect=({sEntry.Rect.X},{sEntry.Rect.Y},{sEntry.Rect.Width},{sEntry.Rect.Height}) svm={sEntry.SvmScore:0.000}";
-                                //}
-                                //Debug.WriteLine(
-                                //    $"ENQ id={tracker.Id} thr={System.Threading.Thread.CurrentThread.ManagedThreadId} f={frameIdx} " +
-                                //    $"buf: {BufEntry(0)} | {BufEntry(1)} | {BufEntry(2)}"
-                                //);
-
-
-                                //********* burası
-
-                                // Kuyruğa ekle (frame klonlama + crop)
-                                //EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
-
-                                // Bu karede kabul edilen bölgeler listesine ekle
-                                //enqueuedThisFrame.Add(cropRect);
-
-                                bool dup = enqueuedThisFrame.Any(rPrev => RectComparisonHelper.IsSamePlate(rPrev, cropRect));
-
-                                if (dup)
-                                {
-                                    Debug.WriteLine($"DEDUP drop id={tracker.Id} f={frameIdx} (combo gate)");
-                                    tracker.ClearOcrEnqueued();
-                                }
-                                else
-                                {
-
-                                 
-                                    EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
-                                    enqueuedThisFrame.Add(cropRect);
-
-                                    Debug.WriteLine($"ENQ id={tracker.Id} thr={System.Threading.Thread.CurrentThread.ManagedThreadId} "
-                         + $"buf=({tracker._ocrBuf[0].FrameIndex}" + " " +
-                         $"{tracker._ocrBuf[1].FrameIndex}" + " " +
-                         $"{tracker._ocrBuf[2].FrameIndex}) f={frameIdx}");
-
-
-                                }
-
-
-
-
-                            }
-                        }
-                        else
-                        {
-                            // Best sample yoksa kilidi geri bırak (başka karede tekrar denesin)
-                            tracker.ClearOcrEnqueued();
-                        }
-                    }
-                }
-                else
-                {
-                    // Ardışık istiyorsan: hit değilse pass serisini sıfırla
-                    tracker.ResetPass();
-                }
-
-                // Bu kare bitti: detection'ı TrackRect'e commit et (valid ise) + flag'i temizle
-                tracker.CommitDetection();
-
-                _tracked[idx] = tracker;
-            }
-        } // fortest
 
 
         // Yan etkisiz: sadece crop seçer, clip eder ve geçerli mi söyler
@@ -823,9 +501,7 @@ namespace PlateRecognation
                             // Dedup kararı (enqueue öncesi, doğru yer)
                             var candidateRect = (best.Rect.Width > 0 && best.Rect.Height > 0) ? best.Rect : cropRect;
 
-                            bool dup = enqueuedThisFrame.Any(rPrev =>
-                                RectComparisonHelper.IsSamePlate(rPrev, candidateRect,
-                                    iouThr: DEDUP_IOU, useAdvanced: DEDUP_USE_ADVANCED));
+                            bool dup = enqueuedThisFrame.Any(rPrev => RectComparisonHelper.IsSamePlate(rPrev, candidateRect, iouThr: DEDUP_IOU, useAdvanced: DEDUP_USE_ADVANCED));
 
                             if (dup)
                             {
@@ -837,10 +513,14 @@ namespace PlateRecognation
                                 // --- UI/diagnostic: dedup kararından SONRA ---
                                 // Güvenli buf log
                                 int cnt = tracker._ocrBuf.Count;
+
                                 string BufEntry(int i)
                                 {
-                                    if (i < 0 || i >= cnt) return "-";
+                                    if (i < 0 || i >= cnt)
+                                        return "-";
+                                    
                                     var e = tracker._ocrBuf[i];
+                                    
                                     return $"[{i}] f={e.FrameIndex} rect=({e.Rect.X},{e.Rect.Y},{e.Rect.Width},{e.Rect.Height}) svm={e.SvmScore:0.000}";
                                 }
                                 Debug.WriteLine(
@@ -848,12 +528,11 @@ namespace PlateRecognation
                                     $"buf: {BufEntry(0)} | {BufEntry(1)} | {BufEntry(2)}"
                                 );
 
-                                // İstersen UI gösterimleri de burada yap:
-                                // DisplayManager.PictureBoxInvoke(MainForm.m_mainForm.pictureBox4, best.Img144x32.ToBitmap());
-                                // ...
 
                                 // Kuyruğa ekle (frame klonlama + crop)
-                                EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
+                                //EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
+
+                                como(tracker);
 
                                 // Bu karede kabul edilenler listesine "gerçek" ROI’yi ekle
                                 enqueuedThisFrame.Add(candidateRect);
@@ -916,8 +595,117 @@ namespace PlateRecognation
             m_plateQueue.TryAdd(pp);
         }
 
-     
 
+
+
+        private void como(SimpleTracker tracker)
+        {
+
+            ThreadSafeList<PossiblePlate> possiblePlates = new ThreadSafeList<PossiblePlate>();
+
+            List<List<CharacterWithROI>> possibleCharacters = new();
+
+            //ThreadSafeList<CharacterWithROI> possibleCharacters = new();
+
+
+            foreach (SimpleTracker.OcrSample item in tracker._ocrBuf)
+            {
+                using var mat = item.Img144x32.Clone();
+                Cv2.CvtColor(mat, mat, ColorConversionCodes.GRAY2BGR);
+
+
+                List<CharacterWithROI> characterSegmentationResult = Character.AhmetAhmetAhmetFindAndCombineCharacterCandidatesv2(mat);
+
+                possibleCharacters.Add(characterSegmentationResult);
+
+            }
+
+            ThreadSafeList<AhmetPlateResult> ahmet = Helper.AhmetAhmetAhmetKuyrukRecognizeAndDisplayPlateResultsListeDöner(possibleCharacters, MainForm.m_mainForm.m_preProcessingSettings);
+
+
+            if (ahmet.Count > 0)
+            {
+                int L = ahmet.Max(a => a.m_characters.Count);
+
+                const double BONUS_3of3 = 0.20;
+                const double BONUS_2of3 = 0.08;
+                const double EPS = 1e-9;
+
+
+                var outChars = new char[L];
+                var posConfs = new List<double>(new double[L]);
+
+                for (int i = 0; i < L; i++)
+                {
+
+                    var agg = new Dictionary<char, double>(Charset34.Length);
+
+                    foreach (var c in Charset34)
+                        agg[c] = 0.0;
+
+                    var argmaxVotes = new Dictionary<char, int>();
+
+                    foreach (var item in ahmet)
+                    {
+                        if (i >= item.m_characters.Count)
+                            continue; // bu örnekte bu pozisyon yok, geç
+
+
+                        var seg = item.m_characters[i];
+
+
+                        foreach (var kv in seg.Confidance)
+                            agg[Convert.ToChar(kv.Item1)] += kv.Item2;
+
+
+                        // çoğunluk oyu için bu örnekteki en yüksek hangi karakter?
+                        var bestKV = seg.Confidance.Aggregate((a, b) => a.Item2 > b.Item2 ? a : b);
+
+                        char bestChar = Convert.ToChar(bestKV.Item1);
+                        argmaxVotes[bestChar] = argmaxVotes.TryGetValue(bestChar, out var cnt) ? cnt + 1 : 1;
+
+                    }
+
+
+                    // 3) Çoğunluk bonusu ekle
+                    foreach (var kv in argmaxVotes)
+                    {
+                        if (kv.Value >= 3)
+                            agg[kv.Key] += BONUS_3of3;
+                        else if (kv.Value == 2)
+                            agg[kv.Key] += BONUS_2of3;
+                    }
+
+
+                    // 4) En yüksek skorlu karakteri seç + pozisyon güvenini oranla hesapla
+                    var best = agg.Aggregate((a, b) => a.Value > b.Value ? a : b);
+                    outChars[i] = best.Key;
+
+                    double denom = agg.Values.Sum() + EPS;
+                    posConfs[i] = best.Value / denom; // "seçilen / toplam" = pozisyon güv.
+
+                }
+
+
+
+                // 5) Metni ve plaka güvenini üret
+                string plate = new string(outChars);
+                double plateConf = posConfs.Average();
+
+                PlateImageReady?.Invoke(this, new PlateImageEventArgs
+                {
+                    Frame = tracker._ocrBuf[0].Img144x32.ToBitmap(),
+                    PlateImage = tracker._ocrBuf[0].Img144x32.ToBitmap(),
+                    ReadingResult = plate,
+                    Probability = plateConf
+                });
+            }
+
+
+           
+        }
+
+        static readonly char[] Charset34 = "0123456789ABCDEFGHIJKLMNOPRSTUVYZQ".ToCharArray();
 
         private void ResetDetectionFlags(ThreadSafeList<SimpleTracker> trackers, int frameIdx)
         {
@@ -940,32 +728,7 @@ namespace PlateRecognation
             }
         }
 
-        // ==== Yardımcılar ====
-
-        // Point2f[] -> Mat (Nx1, CV_32FC2)
-        private static Mat PointsToMat(Point2f[] pts)
-        {
-            var m = new Mat(pts.Length, 1, MatType.CV_32FC2);
-            var idx = m.GetGenericIndexer<Vec2f>();
-            for (int i = 0; i < pts.Length; i++)
-                idx[i, 0] = new Vec2f(pts[i].X, pts[i].Y);
-            return m;
-        }
-
-        private static double Median(IList<double> xs)
-        {
-            if (xs == null || xs.Count == 0) return 0;
-            var arr = xs.OrderBy(v => v).ToArray();
-            int n = arr.Length;
-            return (n % 2 == 1) ? arr[n / 2] : 0.5 * (arr[n / 2 - 1] + arr[n / 2]);
-        }
-
-        static float Median(IEnumerable<float> xs)
-        {
-            var a = xs.OrderBy(v => v).ToArray();
-            int n = a.Length;
-            return n % 2 == 1 ? a[n / 2] : (a[n / 2 - 1] + a[n / 2]) * 0.5f;
-        }
+      
 
     }
 }
