@@ -1,4 +1,5 @@
-﻿using OpenCvSharp.Extensions;
+﻿using OpenCvSharp;
+using OpenCvSharp.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,15 +40,37 @@ namespace PlateRecognation
             _cameraId = cameraId;
         }
 
+
+
+        public ThreadSafeList<AhmetPlateResult> SegmentCharactersFromOcrBuffer(OcrBatch tracker)
+        {
+            List<(List<CharacterDTO>, Mat)> possibleCharacters = new();
+
+            foreach (SimpleTracker.OcrSample item in tracker.Samples)
+            {
+                using var mat = item.Img144x32.Clone();
+                Cv2.CvtColor(mat, mat, ColorConversionCodes.GRAY2BGR);
+
+
+                List<CharacterDTO> characterSegmentationResult = Character.AhmetAhmetAhmetFindAndCombineCharacterCandidatesv2(mat);
+
+                possibleCharacters.Add((characterSegmentationResult, item.Img144x32.Clone()));
+
+            }
+
+
+            ThreadSafeList<AhmetPlateResult> ahmet = Helper.AhmetAhmetAhmetKuyrukRecognizeAndDisplayPlateResultsListeDöner(possibleCharacters, MainForm.m_mainForm.m_preProcessingSettings);
+
+
+            return ahmet;
+        }
+
+
         public List<PlateResult> OcrPlatesFromQueue(PossiblePlate plate)
         {
-            ThreadSafeList<CharacterSegmentationResult> possibleCharacters =
-                Character.SegmentCharactersInPlate(plate);
+            ThreadSafeList<CharacterSegmentationResult> possibleCharacters = Character.SegmentCharactersInPlate(plate);
 
-            ThreadSafeList<PlateResult> ts =
-                Helper.KuyrukRecognizeAndDisplayPlateResultsListeDöner(
-                    possibleCharacters,
-                    MainForm.m_mainForm.m_preProcessingSettings);
+            ThreadSafeList<PlateResult> ts = Helper.KuyrukRecognizeAndDisplayPlateResultsListeDöner(possibleCharacters, MainForm.m_mainForm.m_preProcessingSettings);
 
             foreach (var result in ts)
             {

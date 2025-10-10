@@ -15,5 +15,7 @@ namespace PlateRecognation
         //void OcrPlatesFromQueue(PossiblePlate plate);
 
         List<PlateResult> OcrPlatesFromQueue(PossiblePlate plate);
+
+        ThreadSafeList<AhmetPlateResult> SegmentCharactersFromOcrBuffer(OcrBatch tracker);
     }
 }

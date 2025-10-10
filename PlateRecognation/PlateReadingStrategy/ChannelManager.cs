@@ -68,7 +68,10 @@ namespace PlateRecognation
 
             var cameraReader = new CameraReader(config.VideoSource);
 
+            //hibrit analiz için commentlendi normalde çalışan kısım
             var ddd = new ContinuousOCRImageAnalysis(config.Id);
+
+            //var ddd = new HybridOCRImageAnalysis(config.Id);
 
             var strategy = strategyFactory(config);
 

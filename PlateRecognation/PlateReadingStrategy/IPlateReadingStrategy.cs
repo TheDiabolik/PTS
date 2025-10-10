@@ -17,6 +17,7 @@ namespace PlateRecognation
 
         //void Configure(CameraConfiguration cameraConfiguration);
         void Configure(CameraConfiguration cameraConfiguration, IOCRImageAnalyzer analyzer);
+       
         //void RegisterCallbacks(Action<string, int> onPlateResultReady);
         void Start();
         void Stop();
