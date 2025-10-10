@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace PlateRecognation
 {
-    class SimpleTracker : IDisposable
+   public class SimpleTracker : IDisposable
     {
         public int Id;
         public Rect TrackRect;              // global ROI
@@ -47,7 +47,7 @@ namespace PlateRecognation
 
         public int OcrSamplesCap;
 
-        public readonly List<OcrSample> _ocrBuf = new List<OcrSample>(3);
+        public readonly List<OcrSample> _ocrBuf = new List<OcrSample>();
         public struct OcrSample
         {
             public Mat Img144x32;
@@ -58,9 +58,11 @@ namespace PlateRecognation
 
         }
 
+         
+        public SimpleTracker()
+        {
 
-
-
+        }
         public bool TryMarkOcrEnqueued()
         {
             if (OcrEnqueued) 
@@ -73,14 +75,33 @@ namespace PlateRecognation
         public void ClearOcrEnqueued() => OcrEnqueued = false;
 
 
+        public static OcrBatch GetOcrSnapshotTopK(SimpleTracker simpleTracker)
+        {
+            var deep = new SimpleTracker.OcrSample[simpleTracker._ocrBuf.Count];
 
+            for (int i = 0; i < simpleTracker._ocrBuf.Count; i++)
+            {
+                var s = simpleTracker._ocrBuf[i];
+
+                deep[i] = new SimpleTracker.OcrSample
+                {
+                    Img144x32 = s.Img144x32?.Clone(),
+                    //Sharpness = s.Sharness,
+                    SvmScore = s.SvmScore,
+                    FrameIndex = s.FrameIndex,
+                    Rect = s.Rect
+                };
+            }
+
+            return new OcrBatch { TrackerId = 0, Samples = deep };
+        }
 
 
         public void CommitDetection()
         {
             if (DetectedThisFrame && DetectionRect.Width > 0 && DetectionRect.Height > 0)
                 TrackRect = DetectionRect;   // detection bu karede kazanır
-           
+
             DetectedThisFrame = false;        // bayrağı temizle
         }
 
@@ -197,7 +218,6 @@ namespace PlateRecognation
             return true;
         }
 
-        //private bool ShouldRunGuard() => (FrameIndex - _lastGuardAt) >= GuardIntervalFrames;
 
         /// <summary>
         /// Tek karelik “takip” adımı: gerekirse feature edin, LK takip et, outlier filtrele, kutuyu taşı.
@@ -722,7 +742,18 @@ namespace PlateRecognation
         }
     }
 
+    public sealed class OcrBatch : IDisposable
+    {
+        public int TrackerId { get; init; }
+        public SimpleTracker.OcrSample[] Samples { get; init; } = Array.Empty<SimpleTracker.OcrSample>();
+        public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
 
+        public void Dispose()
+        {
+            foreach (var s in Samples)
+                s.Img144x32?.Dispose();
+        }
+    }
 
 
 }

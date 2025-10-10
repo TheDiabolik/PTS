@@ -710,5 +710,6 @@ namespace PlateRecognation
             m_frameQueue?.Dispose();
             m_cts?.Dispose();
         }
+
     }
 }

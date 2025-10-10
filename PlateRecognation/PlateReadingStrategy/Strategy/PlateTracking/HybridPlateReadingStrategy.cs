@@ -69,6 +69,13 @@ namespace PlateRecognation
         private OCRResultAggregator m_ocrAggregator;
         internal BlockingCollection<PossiblePlate> m_plateQueue;
 
+
+
+        PlateCharacterVotingAggregator m_plateCharacterVotingAggregator;
+        internal BlockingCollection<OcrBatch> _OcrBatchQueue;
+
+
+
         private Action<string, int> m_onPlateResultReady;
 
         private int m_frameIndex = 0;
@@ -82,6 +89,54 @@ namespace PlateRecognation
 
         public event EventHandler<PlateOCRResultEventArgs> PlateResultReady;
         public event EventHandler<PlateImageEventArgs> PlateImageReady;
+
+        //public void Configure(CameraConfiguration cameraConfiguration, HybridOCRImageAnalysis analyzer)
+        //{
+        //    _cameraId = cameraConfiguration.Id;
+        //    m_AutoLightControl = cameraConfiguration.AutoLightControl;
+        //    m_AutoWhiteBalance = cameraConfiguration.AutoWhiteBalance;
+
+        //    m_framePattern = cameraConfiguration.FramePattern;
+        //    m_framePatternEffectiveLength = cameraConfiguration.FramePattern.Count(x => x);
+
+        //    m_framewithROIQueue = new BlockingCollection<FrameWithRoi>(boundedCapacity: m_framePatternEffectiveLength);
+
+        //    //m_framewithROIQueue = new BlockingCollection<FrameWithRoi>(boundedCapacity: 5);
+        //    m_plateQueue = new BlockingCollection<PossiblePlate>(boundedCapacity: 3);
+
+
+        //    //karakter oylama için yazıldı
+        //    m_hybridOCRImageAnalysis = analyzer;
+
+
+        //   m_ocrAggregator = new OCRResultAggregator(_cameraId, 1, 1000);
+
+        //    //m_ocrAggregator = new OCRResultAggregator(_cameraId);
+
+        //    m_ocrAggregator.PlateResultReady += (s, e) => PlateResultReady?.Invoke(this, e);
+        //    m_ocrAggregator.PlateImageReady += (s, e) => PlateImageReady?.Invoke(this, e);
+
+
+        //    m_plateCharacterVotingAggregator = new PlateCharacterVotingAggregator(_cameraId);
+
+        //    m_plateCharacterVotingAggregator.PlateResultReady += (s, e) => PlateResultReady?.Invoke(this, e);
+        //    m_plateCharacterVotingAggregator.PlateImageReady += (s, e) => PlateImageReady?.Invoke(this, e);
+
+
+
+
+
+        //    _OcrBatchQueue = new BlockingCollection<OcrBatch>();
+
+
+
+
+
+        //    m_ocrWorker = new OCRWorker(m_hybridOCRImageAnalysis, _OcrBatchQueue, m_plateCharacterVotingAggregator);
+
+
+           
+        //}
 
         public void Configure(CameraConfiguration cameraConfiguration, IOCRImageAnalyzer analyzer)
         {
@@ -97,17 +152,36 @@ namespace PlateRecognation
             //m_framewithROIQueue = new BlockingCollection<FrameWithRoi>(boundedCapacity: 5);
             m_plateQueue = new BlockingCollection<PossiblePlate>(boundedCapacity: 3);
 
+
+            _OcrBatchQueue = new BlockingCollection<OcrBatch>();
+
             m_ocrAnalyzer = analyzer;
 
-            m_ocrAggregator = new OCRResultAggregator(_cameraId, 1, 1);
+            m_ocrAggregator = new OCRResultAggregator(_cameraId, 1, 1000);
 
             //m_ocrAggregator = new OCRResultAggregator(_cameraId);
 
             m_ocrAggregator.PlateResultReady += (s, e) => PlateResultReady?.Invoke(this, e);
             m_ocrAggregator.PlateImageReady += (s, e) => PlateImageReady?.Invoke(this, e);
 
-            m_ocrWorker = new OCRWorker(m_ocrAnalyzer, m_plateQueue, m_ocrAggregator);
+
+            m_plateCharacterVotingAggregator = new PlateCharacterVotingAggregator(_cameraId);
+
+            m_plateCharacterVotingAggregator.PlateResultReady += (s, e) => PlateResultReady?.Invoke(this, e);
+            m_plateCharacterVotingAggregator.PlateImageReady += (s, e) => PlateImageReady?.Invoke(this, e);
+
+
+
+
+
+
+
+            // m_ocrWorker = new OCRWorker(m_ocrAnalyzer, m_plateQueue, m_ocrAggregator);
+
+            m_ocrWorker = new OCRWorker(m_ocrAnalyzer, _OcrBatchQueue, m_plateCharacterVotingAggregator);
+
         }
+
 
         public void SetCameraChannel(CameraChannel cameraChannel)
         {
@@ -128,8 +202,11 @@ namespace PlateRecognation
             m_processTask = Task.Factory.StartNew(() =>
                 ProcessFrames(m_cts.Token), TaskCreationOptions.LongRunning);
 
+            //       m_OCRTask = Task.Factory.StartNew(() =>
+            //m_ocrWorker.Start(m_cts.Token), TaskCreationOptions.LongRunning);
+
             m_OCRTask = Task.Factory.StartNew(() =>
-     m_ocrWorker.Start(m_cts.Token), TaskCreationOptions.LongRunning);
+    m_ocrWorker.Mtart(m_cts.Token), TaskCreationOptions.LongRunning);
         }
 
         public void Stop()

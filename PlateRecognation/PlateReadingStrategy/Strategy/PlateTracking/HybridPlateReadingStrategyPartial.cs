@@ -532,7 +532,16 @@ namespace PlateRecognation
                                 // Kuyruğa ekle (frame klonlama + crop)
                                 //EnqueueBestPlate(currBgr, cropRect, tracker.LastScore, best);
 
-                                como(tracker);
+                                //como(tracker);
+                               // lock (_lock)
+                                {
+                                    //_trackerQueue.Add(tracker);
+                                }
+
+
+                               OcrBatch ocrBatch = SimpleTracker.GetOcrSnapshotTopK(tracker);
+                                _OcrBatchQueue.Add(ocrBatch);
+
 
                                 // Bu karede kabul edilenler listesine "gerçek" ROI’yi ekle
                                 enqueuedThisFrame.Add(candidateRect);
@@ -574,7 +583,7 @@ namespace PlateRecognation
         }
 
 
-
+        private readonly object _lock = new();
 
         private void EnqueueBestPlate(Mat currBgr, Rect cropRect, double score, SimpleTracker.OcrSample best)
         {
@@ -595,117 +604,6 @@ namespace PlateRecognation
             m_plateQueue.TryAdd(pp);
         }
 
-
-
-
-        private void como(SimpleTracker tracker)
-        {
-
-            ThreadSafeList<PossiblePlate> possiblePlates = new ThreadSafeList<PossiblePlate>();
-
-            List<List<CharacterWithROI>> possibleCharacters = new();
-
-            //ThreadSafeList<CharacterWithROI> possibleCharacters = new();
-
-
-            foreach (SimpleTracker.OcrSample item in tracker._ocrBuf)
-            {
-                using var mat = item.Img144x32.Clone();
-                Cv2.CvtColor(mat, mat, ColorConversionCodes.GRAY2BGR);
-
-
-                List<CharacterWithROI> characterSegmentationResult = Character.AhmetAhmetAhmetFindAndCombineCharacterCandidatesv2(mat);
-
-                possibleCharacters.Add(characterSegmentationResult);
-
-            }
-
-            ThreadSafeList<AhmetPlateResult> ahmet = Helper.AhmetAhmetAhmetKuyrukRecognizeAndDisplayPlateResultsListeDöner(possibleCharacters, MainForm.m_mainForm.m_preProcessingSettings);
-
-
-            if (ahmet.Count > 0)
-            {
-                int L = ahmet.Max(a => a.m_characters.Count);
-
-                const double BONUS_3of3 = 0.20;
-                const double BONUS_2of3 = 0.08;
-                const double EPS = 1e-9;
-
-
-                var outChars = new char[L];
-                var posConfs = new List<double>(new double[L]);
-
-                for (int i = 0; i < L; i++)
-                {
-
-                    var agg = new Dictionary<char, double>(Charset34.Length);
-
-                    foreach (var c in Charset34)
-                        agg[c] = 0.0;
-
-                    var argmaxVotes = new Dictionary<char, int>();
-
-                    foreach (var item in ahmet)
-                    {
-                        if (i >= item.m_characters.Count)
-                            continue; // bu örnekte bu pozisyon yok, geç
-
-
-                        var seg = item.m_characters[i];
-
-
-                        foreach (var kv in seg.Confidance)
-                            agg[Convert.ToChar(kv.Item1)] += kv.Item2;
-
-
-                        // çoğunluk oyu için bu örnekteki en yüksek hangi karakter?
-                        var bestKV = seg.Confidance.Aggregate((a, b) => a.Item2 > b.Item2 ? a : b);
-
-                        char bestChar = Convert.ToChar(bestKV.Item1);
-                        argmaxVotes[bestChar] = argmaxVotes.TryGetValue(bestChar, out var cnt) ? cnt + 1 : 1;
-
-                    }
-
-
-                    // 3) Çoğunluk bonusu ekle
-                    foreach (var kv in argmaxVotes)
-                    {
-                        if (kv.Value >= 3)
-                            agg[kv.Key] += BONUS_3of3;
-                        else if (kv.Value == 2)
-                            agg[kv.Key] += BONUS_2of3;
-                    }
-
-
-                    // 4) En yüksek skorlu karakteri seç + pozisyon güvenini oranla hesapla
-                    var best = agg.Aggregate((a, b) => a.Value > b.Value ? a : b);
-                    outChars[i] = best.Key;
-
-                    double denom = agg.Values.Sum() + EPS;
-                    posConfs[i] = best.Value / denom; // "seçilen / toplam" = pozisyon güv.
-
-                }
-
-
-
-                // 5) Metni ve plaka güvenini üret
-                string plate = new string(outChars);
-                double plateConf = posConfs.Average();
-
-                PlateImageReady?.Invoke(this, new PlateImageEventArgs
-                {
-                    Frame = tracker._ocrBuf[0].Img144x32.ToBitmap(),
-                    PlateImage = tracker._ocrBuf[0].Img144x32.ToBitmap(),
-                    ReadingResult = plate,
-                    Probability = plateConf
-                });
-            }
-
-
-           
-        }
-
-        static readonly char[] Charset34 = "0123456789ABCDEFGHIJKLMNOPRSTUVYZQ".ToCharArray();
 
         private void ResetDetectionFlags(ThreadSafeList<SimpleTracker> trackers, int frameIdx)
         {

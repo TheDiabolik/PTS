@@ -1378,5 +1378,6 @@ namespace PlateRecognation
             m_kernel3?.Dispose();
         }
 
+     
     }
 }
