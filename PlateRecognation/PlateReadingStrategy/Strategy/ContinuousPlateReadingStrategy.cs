@@ -196,7 +196,10 @@ namespace PlateRecognation
             {
                 try
                 {
-                    var plates = ImageAnalysisHelper.SobelliYENİMSERRESIMLIDetectPlateRegionsResizeHybrid(frame);
+                    //var plates = ImageAnalysisHelper.SobelliYENİMSERRESIMLIDetectPlateRegionsResizeHybrid(frame);
+
+                    var plates = ImageAnalysisHelper.ROIMOTIONSobelliYENİMSERRESIMLIDetectPlateRegionsResizeHybrid(frame);
+
 
                     if (plates?.Any() == true)
                     {
@@ -229,5 +232,7 @@ namespace PlateRecognation
                 }
             }
         }
+
+      
     }
 }

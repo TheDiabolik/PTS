@@ -922,6 +922,8 @@ namespace PlateRecognation
             }
         }
 
+      
+
 
         //public void OcrPlatesFromQueue(CancellationToken token)
         //{
@@ -998,6 +1000,6 @@ namespace PlateRecognation
         //    ocrResultQueue.Clear();
         //}
 
-      
+
     }
 }
