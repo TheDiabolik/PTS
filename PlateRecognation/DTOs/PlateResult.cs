@@ -25,4 +25,23 @@ namespace PlateRecognation
 
         public List<Mat> m_characters { get; set; }
     }
+
+    public class AhmetPlateResult
+    {
+        //public Bitmap frame { get; set; }
+
+        public Bitmap plate { get; set; }
+        //public Bitmap segmented { get; set; }
+        //public Bitmap threshould { get; set; }
+
+        //public OpenCvSharp.Rect addedRects { get; set; } // Plate'in yer bilgisi
+
+        public string readingPlateResult { get; set; }
+
+        public double readingPlateResultProbability { get; set; }
+
+        //public DateTime LastDetectionTime { get; set; } // Tespit edilen son zaman
+
+        public List<CharacterDTO> m_characters { get; set; }
+    }
 }
