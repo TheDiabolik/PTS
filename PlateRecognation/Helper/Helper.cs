@@ -568,6 +568,76 @@ namespace PlateRecognation
         }
 
 
+
+
+        public static ThreadSafeList<AhmetPlateResult> AhmetAhmetAhmetKuyrukRecognizeAndDisplayPlateResultsListeDöner(List<(List<CharacterDTO>, Mat)> possibleCharacters, PreProcessingSettings preProcessingSettings)
+        {
+            //lock (osman)
+            {
+                ThreadSafeList<AhmetPlateResult> allPlateResults = new ThreadSafeList<AhmetPlateResult>();
+
+
+                foreach ((List<CharacterDTO>, Mat) possibleCharacter in possibleCharacters)
+                {
+                    List<Mat> filteredCharacters = new List<Mat>();
+
+                    //List<CharacterDTO> characters = new List<CharacterDTO>();
+
+                    List<CharacterDTO> characters = possibleCharacter.Item1;
+
+
+                    (string plateKara, double confidence, List<CharacterDTO> characterMat, TupleList<string, double> characterInPlate) readingResult;
+
+                    lock (osman)
+                    {
+                        //readingResult = OCRHelper.SVMModalOCRPredictionWithConfidenceApplyMajorityVoting2(characters, 60, 2);
+
+                        readingResult = OCRHelper.AhmetAhmetAhmetSVMModalOCRPredictionWithConfidenceApplyMajorityVoting2(characters, 60, 2);
+
+
+                    }
+
+                    string plateToString = readingResult.plateKara;
+                    double readingProbability = readingResult.confidence;
+                    TupleList<string, double> characterScores = readingResult.characterInPlate; // TupleList<string, double>
+                    //List<Mat> newCharacters = readingResult.characterMat;readingResult
+
+
+
+                    List<CharacterDTO> newCharacters = readingResult.characterMat;
+
+
+                    if (string.IsNullOrEmpty(plateToString))
+                        continue;
+
+
+                    // //Debug.WriteLine("Okunan Plaka : " + plateToString);
+
+
+                    // 📦 PlateResult objesi oluştur
+                    AhmetPlateResult plateResult = new AhmetPlateResult()
+                    {
+                        //plate = BitmapConverter.ToBitmap(possibleCharacter.colorPlate),
+                        //segmented = BitmapConverter.ToBitmap(possibleCharacter.segmentedPlate),
+                        //threshould = BitmapConverter.ToBitmap(possibleCharacter.thresh),
+                        // addedRects = possibleCharacter.plateLocation,
+                        plate = possibleCharacter.Item2.ToBitmap(),
+                        readingPlateResult = plateToString,
+                        readingPlateResultProbability = readingProbability,
+                        m_characters = newCharacters,
+
+                        // LastDetectionTime = DateTime.Now
+                    };
+
+                    allPlateResults.Add(plateResult);
+                }
+
+
+
+                return allPlateResults;
+            }
+        }
+
         //static List<(string plateKara, double confidence, List<Mat> characterMat)> m_possible = new List<(string plateKara, double confidence, List<Mat> characterMat)>();
 
         public static List<(string plateKara, double confidence, CharacterSegmentationResult possibleCharacter)> m_possible = new List<(string plateKara, double confidence, CharacterSegmentationResult possibleCharacter)>();

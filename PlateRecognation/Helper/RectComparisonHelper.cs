@@ -274,7 +274,7 @@ namespace PlateRecognation
 
 
         // kapsama oranı (küçüğün ne kadarı kesişiyor?)
-        static double OverlapRatio(Rect s, Rect t)
+       public  static double OverlapRatio(Rect s, Rect t)
         {
             int x1 = Math.Max(s.X, t.X);
             int y1 = Math.Max(s.Y, t.Y);
@@ -313,34 +313,99 @@ namespace PlateRecognation
             return iouOk || nearCenters || containment;
         }
 
+//        public static bool IsSamePlate(
+//    Rect a, Rect b,
+//    double iouThr = 0.65,
+//    bool useAdvanced = false,
+//    double centerThr = 0.16,   // merkez norm (küçük diyagonale göre)
+//    double scaleMax = 1.6,     // alan oran üst sınırı
+//    double aspectTol = 0.20,   // en-boy fark toleransı (göreli)
+//    double containThr = 0.80   // containment eşiği
+//)
+//        {
+//            double iou = IoU(a, b);
+
+//            if (iou >= iouThr) 
+//                return true;          // Varsayılan: IoU-only
+
+//            if (!useAdvanced) 
+//                return false;          // Gelişmiş kapı kapalıysa burada biter
+
+//            // --- Gelişmiş ölçütler ---
+//            double ax = a.X + a.Width * 0.5, ay = a.Y + a.Height * 0.5;
+//            double bx = b.X + b.Width * 0.5, by = b.Y + b.Height * 0.5;
+//            double cdist = Math.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+//            double diagA = Math.Sqrt(a.Width * a.Width + a.Height * a.Height);
+//            double diagB = Math.Sqrt(b.Width * b.Width + b.Height * b.Height);
+//            double centerNorm = cdist / Math.Max(1.0, Math.Min(diagA, diagB)); // küçük diyagonale göre
+
+//            double areaA = Math.Max(1, a.Width * a.Height);
+//            double areaB = Math.Max(1, b.Width * b.Height);
+//            double scaleRatio = Math.Max(areaA, areaB) / Math.Min(areaA, areaB);
+
+//            double aspA = (double)a.Width / Math.Max(1, a.Height);
+//            double aspB = (double)b.Width / Math.Max(1, b.Height);
+//            double aspDiffRel = Math.Abs(aspA - aspB) / Math.Max(aspA, aspB);
+
+//            double containAB = OverlapRatio(a, b);
+//            double containBA = OverlapRatio(b, a);
+//            bool containmentOk = Math.Max(containAB, containBA) >= containThr;
+
+//            // Oylama: en az 3 koşul + containment varsa daha da güçlü say
+//            int votes = 0;
+
+//            if (centerNorm <= centerThr) 
+//                votes++;
+
+//            if (scaleRatio <= scaleMax)
+//                votes++;
+
+//            if (aspDiffRel <= aspectTol)
+//                votes++;
+
+//            if (containmentOk) 
+//                votes++;
+
+//            // containment tek başına yeterli olmasın; en azından merkez veya oran da yakın olsun
+//            if (containmentOk && (centerNorm <= centerThr || aspDiffRel <= aspectTol)) 
+//                return true;
+
+//            return votes >= 3;
+//        }
+
+
         public static bool IsSamePlate(
     Rect a, Rect b,
     double iouThr = 0.65,
     bool useAdvanced = false,
-    double centerThr = 0.16,   // merkez norm (küçük diyagonale göre)
+    double centerThr = 0.16,   // merkez norm eşiği
     double scaleMax = 1.6,     // alan oran üst sınırı
     double aspectTol = 0.20,   // en-boy fark toleransı (göreli)
-    double containThr = 0.80   // containment eşiği
+    double containThr = 0.80,  // containment eşiği
+    bool normalizeCenterByMeanDiag = false // min yerine ortalama diyagonal?
 )
         {
+            // 0) Geçersiz/boş kutu
+            if (a.Width <= 0 || a.Height <= 0 || b.Width <= 0 || b.Height <= 0)
+                return false;
+
+            // 1) Hızlı yol: IoU
             double iou = IoU(a, b);
+            if (iou >= iouThr) return true;
+            if (!useAdvanced) return false;
 
-            if (iou >= iouThr) 
-                return true;          // Varsayılan: IoU-only
-
-            if (!useAdvanced) 
-                return false;          // Gelişmiş kapı kapalıysa burada biter
-
-            // --- Gelişmiş ölçütler ---
+            // 2) Gelişmiş ölçütler
             double ax = a.X + a.Width * 0.5, ay = a.Y + a.Height * 0.5;
             double bx = b.X + b.Width * 0.5, by = b.Y + b.Height * 0.5;
-            double cdist = Math.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
-            double diagA = Math.Sqrt(a.Width * a.Width + a.Height * a.Height);
-            double diagB = Math.Sqrt(b.Width * b.Width + b.Height * b.Height);
-            double centerNorm = cdist / Math.Max(1.0, Math.Min(diagA, diagB)); // küçük diyagonale göre
+            double dx = ax - bx, dy = ay - by;
 
-            double areaA = Math.Max(1, a.Width * a.Height);
-            double areaB = Math.Max(1, b.Width * b.Height);
+            double diagA = Math.Sqrt((double)a.Width * a.Width + (double)a.Height * a.Height);
+            double diagB = Math.Sqrt((double)b.Width * b.Width + (double)b.Height * b.Height);
+            double normBase = normalizeCenterByMeanDiag ? 0.5 * (diagA + diagB) : Math.Min(diagA, diagB);
+            double centerNorm = Math.Sqrt(dx * dx + dy * dy) / Math.Max(1.0, normBase);
+
+            double areaA = Math.Max(1.0, (double)a.Width * a.Height);
+            double areaB = Math.Max(1.0, (double)b.Width * b.Height);
             double scaleRatio = Math.Max(areaA, areaB) / Math.Min(areaA, areaB);
 
             double aspA = (double)a.Width / Math.Max(1, a.Height);
@@ -351,28 +416,54 @@ namespace PlateRecognation
             double containBA = OverlapRatio(b, a);
             bool containmentOk = Math.Max(containAB, containBA) >= containThr;
 
-            // Oylama: en az 3 koşul + containment varsa daha da güçlü say
-            int votes = 0;
+            // 3) Açık mantık (oy toplama yerine)
+            bool nearCenter = centerNorm <= centerThr;
+            bool scaleOk = scaleRatio <= scaleMax;
+            bool aspectOk = aspDiffRel <= aspectTol;
 
-            if (centerNorm <= centerThr) 
-                votes++;
-
-            if (scaleRatio <= scaleMax)
-                votes++;
-
-            if (aspDiffRel <= aspectTol)
-                votes++;
-
-            if (containmentOk) 
-                votes++;
-
-            // containment tek başına yeterli olmasın; en azından merkez veya oran da yakın olsun
-            if (containmentOk && (centerNorm <= centerThr || aspDiffRel <= aspectTol)) 
+            if ((nearCenter && scaleOk && aspectOk) ||
+                (containmentOk && (nearCenter || aspectOk)))
                 return true;
 
-            return votes >= 3;
+            return false;
         }
 
 
+
+        // Seeding aşamasına özel, “yakın-aynı” kontrol.
+        // IsSamePlate’e göre daha sıkı: IoU ağırlıklı; merkez ve ölçek farkı daha dar tutulur.
+        public static bool IsNearDuplicateSeed(Rect a, Rect b)
+        {
+            double iou = RectComparisonHelper.IoU(a, b);
+            if (iou >= 0.70) return true; // seeding için daha yüksek IoU
+
+            // Merkez-normalizasyon (ortalama diyagonal)
+            double ax = a.X + a.Width * 0.5, ay = a.Y + a.Height * 0.5;
+            double bx = b.X + b.Width * 0.5, by = b.Y + b.Height * 0.5;
+            double dx = ax - bx, dy = ay - by;
+
+            double diagA = Math.Sqrt(a.Width * a.Width + a.Height * a.Height);
+            double diagB = Math.Sqrt(b.Width * b.Width + b.Height * b.Height);
+            double centerNorm = Math.Sqrt(dx * dx + dy * dy) / Math.Max(1.0, 0.5 * (diagA + diagB));
+
+            // Ölçek ve en-boy oranı farkını dar tut
+            double areaA = Math.Max(1, a.Width * a.Height);
+            double areaB = Math.Max(1, b.Width * b.Height);
+            double areaRatio = areaA >= areaB ? areaA / areaB : areaB / areaA; // >=1
+            double arA = (double)a.Width / Math.Max(1, a.Height);
+            double arB = (double)b.Width / Math.Max(1, b.Height);
+            double arRatio = arA >= arB ? arA / arB : arB / arA; // >=1
+
+            bool nearCentersTight = centerNorm <= 0.12 && areaRatio <= 1.6 && arRatio <= 1.4;
+            if (nearCentersTight) return true;
+
+            // İçerme (containment) güçlü ise de tek say
+            double containAB = RectComparisonHelper.OverlapRatio(a, b);
+            double containBA = RectComparisonHelper.OverlapRatio(b, a);
+            bool strongContain = (containAB >= 0.85) || (containBA >= 0.85);
+            if (strongContain) return true;
+
+            return false;
+        }
     }
 }

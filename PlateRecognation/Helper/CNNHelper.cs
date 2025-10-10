@@ -37,10 +37,55 @@ namespace PlateRecognation
 
             var erswefwe = SoftmaxWithIndices(predictions);
 
+
             return (predictedClass, confidence);
 
 
         }
+
+
+
+        public static (int predictedClass, double confidence, List<(string, int, double)> characterWithConfidence) AhmetAhmetAhmetTestCNN(Net<double> network, Mat image)
+        {
+            double[] inputVector = Helper.ImageToPixel(image);
+
+
+            // Giriş verisini Volume<double> formatına dönüştür
+            Volume<double> inputVolume = BuilderInstance<double>.Volume.From(inputVector, m_shape);
+
+            // İleri geçiş (forward pass) yap
+            Volume<double> outputVolume = network.Forward(inputVolume);
+
+            int[] sdds = network.GetPrediction();
+
+
+
+
+            // Çıktıdaki maksimum olasılığı ve indexini bul
+            double[] predictions = outputVolume.ToArray(); // Çıktı olasılıklarını al
+            int predictedClass = Array.IndexOf(predictions, predictions.Max());
+            double confidence = predictions.Max() * 100; // En büyük olasılığı % olarak hesapla
+
+
+            List<(int, double)> erswefwe = SoftmaxWithIndices(predictions);
+
+            List <(string, int , double)> lolo = new List<(string, int, double)> ();
+
+
+            foreach ((int, double) item in erswefwe)
+            {
+                int classIndex = item.Item1;
+                string classString = OCRHelper.FindCharacter(classIndex);
+
+
+                lolo.Add((classString, classIndex, item.Item2 * 100));
+            }
+
+
+
+            return (predictedClass, confidence, lolo);
+        }
+
 
         public static async Task<(int predictedClass, double confidence)> TestCNNAsync(Net<double> network, Mat image)
         {

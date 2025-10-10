@@ -11,8 +11,91 @@ namespace PlateRecognation
 {
     internal class OCRHelper
     {
+
         //static Stopwatch sw = new Stopwatch();
-        public static (string plateKara, double confidence, List<Mat> characterMat, TupleList<string, double>) SVMModalOCRPredictionWithConfidenceApplyMajorityVoting2(List<Mat> characterRegions, int confidence, int countingFrameCount)
+        public static (string plateKara, double confidence, List<CharacterDTO> characterMat, TupleList<string, double> plateCharacterWithConfidance) AhmetAhmetAhmetSVMModalOCRPredictionWithConfidenceApplyMajorityVoting2(List<CharacterDTO> characterRegions, int confidence, int countingFrameCount)
+        {
+            //sw.Restart();
+
+            // Her karakterin güven skorlarını depolamak için bir liste
+            List<double> characterConfidences = new List<double>();
+
+            List<CharacterDTO> characterDTO= new List<CharacterDTO>();
+            
+            
+            TupleList<string, double> tupleList = new TupleList<string, double>();
+
+            string plateKara = "";
+            double plateConfidence = 0;
+
+            foreach (var bbox in characterRegions)
+            {
+                Mat mat = bbox.Character.Clone();
+
+                Cv2.Resize(mat, mat, new OpenCvSharp.Size(20, 20)); // HOG ile uyumlu boyut
+                //Cv2.Resize(mat, mat, new OpenCvSharp.Size(20, 20), 0, 0, InterpolationFlags.Lanczos4);
+
+                //var prediction = CNNHelper.TestCNN(MainForm.m_mainForm.m_loadedCNN, mat);
+
+                var prediction1111111 = CNNHelper.AhmetAhmetAhmetTestCNN(MainForm.m_mainForm.m_loadedCNN, mat);
+
+                //if (prediction.confidence > confidence)
+                {
+                    int eeee = prediction1111111.predictedClass;
+
+                    string cha = "NC";
+
+                    cha = FindCharacter(eeee);
+
+                    if (cha != "NC")
+                    {
+                        plateKara += cha;
+                        characterConfidences.Add(prediction1111111.confidence);
+
+
+                        characterDTO.Add(new CharacterDTO() { Character = bbox.Character, OCRResult = cha, Area = bbox.Area, ROI = bbox.ROI,
+                            Confidance = prediction1111111.characterWithConfidence });
+
+                        tupleList.Add(cha, prediction1111111.confidence);
+
+                    }
+
+                }
+
+            }
+
+
+
+
+            //if (!string.IsNullOrEmpty(plateKara) && (OCRHelper..Plate(plateKara.ToCharArray())))
+            //if (!string.IsNullOrEmpty(plateKara) && (plateKara.Length >= 6) && (PlateFormatHelper.IsPlatePatternValid(plateKara)))
+            //if (!string.IsNullOrEmpty(plateKara) && (plateKara.Length >= 6) && (enforceTurkishPlatePattern == Enums.PlateType.All || PlateFormatHelper.IsProbablyTurkishPlate(plateKara)))
+            if (!string.IsNullOrEmpty(plateKara) && (plateKara.Length >= 6))
+            {
+                // Tüm karakterlerin ortalama güven skoru
+                plateConfidence = characterConfidences.Average();
+
+                if (plateConfidence >= confidence)
+                {
+                    ////Debug.WriteLine("PTS Geçen Süre : " + sw.ElapsedMilliseconds.ToString());
+                    return (plateKara, plateConfidence, characterDTO, tupleList);
+                }
+
+            }
+            else
+                plateKara = "";
+
+
+            ////Debug.WriteLine("PTS Geçen Süre : " + sw.ElapsedMilliseconds.ToString());
+
+            return (plateKara, plateConfidence, characterDTO, tupleList);
+
+
+        }
+
+
+        //static Stopwatch sw = new Stopwatch();
+        public static (string plateKara, double confidence, List<Mat> characterMat, TupleList<string, double> ) SVMModalOCRPredictionWithConfidenceApplyMajorityVoting2(List<Mat> characterRegions, int confidence, int countingFrameCount)
         {
             //sw.Restart();
 
@@ -30,6 +113,10 @@ namespace PlateRecognation
 
                 Cv2.Resize(mat, mat, new OpenCvSharp.Size(20, 20)); // HOG ile uyumlu boyut
                 //Cv2.Resize(mat, mat, new OpenCvSharp.Size(20, 20), 0, 0, InterpolationFlags.Lanczos4);
+
+
+                var prediction1111111 = CNNHelper.AhmetAhmetAhmetTestCNN(MainForm.m_mainForm.m_loadedCNN, mat);
+
 
                 var prediction = CNNHelper.TestCNN(MainForm.m_mainForm.m_loadedCNN, mat);
 
